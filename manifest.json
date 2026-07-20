@@ -1,0 +1,234 @@
+{
+  "project": "crm-billing-universidad",
+  "seed": 42,
+  "domains": {
+    "university": {
+      "semesters": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/semesters.csv",
+        "rows": 8,
+        "cols": [
+          "semester_id",
+          "code",
+          "year",
+          "half",
+          "start_date",
+          "end_date"
+        ]
+      },
+      "professors": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/professors.csv",
+        "rows": 200,
+        "cols": [
+          "professor_id",
+          "first_name",
+          "last_name",
+          "email",
+          "department",
+          "hired_at"
+        ]
+      },
+      "students": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/students.csv",
+        "rows": 5000,
+        "cols": [
+          "student_id",
+          "first_name",
+          "last_name",
+          "email",
+          "birth_date",
+          "enrolled_at",
+          "country"
+        ]
+      },
+      "courses": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/courses.csv",
+        "rows": 300,
+        "cols": [
+          "course_id",
+          "code",
+          "name",
+          "credits",
+          "department",
+          "professor_id"
+        ]
+      },
+      "enrollments": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/enrollments.csv",
+        "rows": 25000,
+        "cols": [
+          "enrollment_id",
+          "enrolled_at",
+          "status",
+          "student_id",
+          "course_id",
+          "semester_id"
+        ]
+      },
+      "grades": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/university/grades.csv",
+        "rows": 60000,
+        "cols": [
+          "grade_id",
+          "assessment",
+          "score",
+          "weight",
+          "graded_at",
+          "enrollment_id"
+        ]
+      }
+    },
+    "billing": {
+      "customers": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/customers.csv",
+        "rows": 10000,
+        "cols": [
+          "customer_id",
+          "external_ref",
+          "first_name",
+          "last_name",
+          "email",
+          "country",
+          "created_at",
+          "segment"
+        ]
+      },
+      "products": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/products.csv",
+        "rows": 200,
+        "cols": [
+          "product_id",
+          "sku",
+          "name",
+          "category",
+          "monthly_price",
+          "active"
+        ]
+      },
+      "subscriptions": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/subscriptions.csv",
+        "rows": 15000,
+        "cols": [
+          "subscription_id",
+          "status",
+          "start_date",
+          "end_date",
+          "customer_id",
+          "product_id"
+        ]
+      },
+      "invoices": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/invoices.csv",
+        "rows": 50000,
+        "cols": [
+          "invoice_id",
+          "issued_at",
+          "due_at",
+          "total",
+          "status",
+          "currency",
+          "customer_id"
+        ]
+      },
+      "invoice_items": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/invoice_items.csv",
+        "rows": 150000,
+        "cols": [
+          "invoice_item_id",
+          "quantity",
+          "unit_price",
+          "line_total",
+          "invoice_id",
+          "product_id"
+        ]
+      },
+      "payments": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/billing/payments.csv",
+        "rows": 80000,
+        "cols": [
+          "payment_id",
+          "amount",
+          "paid_at",
+          "method",
+          "invoice_id"
+        ]
+      }
+    },
+    "crm": {
+      "accounts": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/accounts.csv",
+        "rows": 5000,
+        "cols": [
+          "account_id",
+          "name",
+          "industry",
+          "country",
+          "annual_revenue",
+          "employees",
+          "created_at"
+        ]
+      },
+      "contacts": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/contacts.csv",
+        "rows": 15000,
+        "cols": [
+          "contact_id",
+          "first_name",
+          "last_name",
+          "email",
+          "phone",
+          "title",
+          "created_at",
+          "account_id"
+        ]
+      },
+      "leads": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/leads.csv",
+        "rows": 2000,
+        "cols": [
+          "lead_id",
+          "first_name",
+          "last_name",
+          "email",
+          "source",
+          "status",
+          "score",
+          "created_at"
+        ]
+      },
+      "opportunities": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/opportunities.csv",
+        "rows": 3000,
+        "cols": [
+          "opportunity_id",
+          "name",
+          "stage",
+          "amount",
+          "close_date",
+          "created_at",
+          "account_id"
+        ]
+      },
+      "opportunity_contacts": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/opportunity_contacts.csv",
+        "rows": 6000,
+        "cols": [
+          "opportunity_id",
+          "contact_id",
+          "role"
+        ]
+      },
+      "activities": {
+        "path": "/home/melgary/Proyectos/data-engineer/data-test/output/crm-billing-universidad/crm/activities.csv",
+        "rows": 20000,
+        "cols": [
+          "activity_id",
+          "type",
+          "subject",
+          "occurred_at",
+          "contact_id",
+          "opportunity_id"
+        ]
+      }
+    }
+  }
+}

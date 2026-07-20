@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment / secrets
+.env
+*.env.local
+
+# Docker runtime volumes (Postgres data dir, Airflow logs, etc.)
+docker/volumes/
+docker/logs/
+
+# Airflow local runtime artifacts
+logs/
+airflow.db
+airflow-webserver.pid
+standalone_admin_password.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / local tooling
+.claude/settings.local.json
+.vscode/
