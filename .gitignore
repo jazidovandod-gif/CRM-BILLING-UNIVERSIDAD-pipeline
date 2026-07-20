@@ -29,3 +29,7 @@ Thumbs.db
 # Editor / local tooling
 .claude/settings.local.json
 .vscode/
+
+# Notas personales locales (no es parte de los entregables del proyecto;
+# el contenido validado vive en docs/calidad-datos.md y docs/decisiones.md)
+obsidian/

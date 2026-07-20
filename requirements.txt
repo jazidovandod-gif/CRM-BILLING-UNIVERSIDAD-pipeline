@@ -1,0 +1,23 @@
+# ============================================
+# Dependencias Python — Bootcamp Ingeniería de Datos
+# Compartidas entre Airflow y Jupyter
+# ============================================
+
+# Manipulación de datos
+# Versiones alineadas al constraints file oficial de Airflow 2.8.1
+# (python 3.11) para que "docker/airflow.Dockerfile" pueda instalar
+# este mismo requirements.txt con --constraint sin conflictos de resolución.
+pandas==2.1.4
+
+# Formato columnar (exportación Parquet)
+pyarrow==14.0.2
+
+# Conexión a PostgreSQL
+# sqlalchemy fijado a 1.4.x: Airflow 2.8.1 requiere SQLAlchemy <2.0,
+# instalar 2.0.x rompe "airflow db migrate" (ArgumentError en executemany_mode)
+sqlalchemy==1.4.51
+psycopg2-binary==2.9.9
+
+# Visualización
+matplotlib==3.8.3
+seaborn==0.13.2

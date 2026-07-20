@@ -1,0 +1,141 @@
+# ============================================
+# Docker Compose — Bootcamp Ingeniería de Datos
+# Servicios: PostgreSQL, Airflow, Jupyter
+# ============================================
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: docker/airflow.Dockerfile
+  env_file:
+    - .env
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./sql:/opt/airflow/sql
+    - ./data:/opt/airflow/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks:
+    - bootcamp-network
+
+services:
+  # ──────────────────────────────────────────
+  # PostgreSQL — Data Warehouse + Airflow Meta
+  # ──────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: bootcamp-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-schemas.sql:/docker-entrypoint-initdb.d/01-init-schemas.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bootcamp -d datawarehouse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+
+  # ──────────────────────────────────────────
+  # Airflow Init — Inicializa BD y usuario admin
+  # ──────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    container_name: bootcamp-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@bootcamp.local || true
+    restart: "no"
+
+  # ──────────────────────────────────────────
+  # Airflow Webserver — Interfaz web (puerto 8080)
+  # ──────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: bootcamp-airflow-webserver
+    command: airflow webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # Airflow Scheduler — Ejecutor de DAGs
+  # ──────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: bootcamp-airflow-scheduler
+    command: airflow scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # Jupyter Notebook — Exploración y análisis
+  # ──────────────────────────────────────────
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/jupyter.Dockerfile
+    container_name: bootcamp-jupyter
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-bootcamp}
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./data:/home/jovyan/data
+      - ./src:/home/jovyan/src
+      - ./sql:/home/jovyan/sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+
+# ──────────────────────────────────────────
+# Volúmenes persistentes
+# ──────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: bootcamp-postgres-data
+
+# ──────────────────────────────────────────
+# Red compartida
+# ──────────────────────────────────────────
+networks:
+  bootcamp-network:
+    name: bootcamp-network
+    driver: bridge
