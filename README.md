@@ -19,6 +19,39 @@ No existe una única solución correcta. Se evalúa el criterio, la trazabilidad
 
 ---
 
+## Estado actual del proyecto
+
+Avance verificado al 2026-07-21:
+
+- Infraestructura Docker operativa: PostgreSQL, Airflow y Jupyter.
+- Discovery ejecutado sobre los 18 CSV y 446,708 filas.
+- Auditoría reproducible de PK, FK, calidad semántica y relaciones cross-domain.
+- Capa Bronze implementada en PostgreSQL: 18 tablas fuente y una tabla de control.
+- Primera carga reconciliada: 446,708/446,708 filas.
+- Reejecución idempotente: 0 filas duplicadas.
+- Silver, Gold, DAG de Airflow y exportación Parquet todavía pendientes.
+
+Documentación principal:
+
+- [`docs/calidad-datos.md`](./docs/calidad-datos.md)
+- [`docs/analisis-datos-completo.md`](./docs/analisis-datos-completo.md)
+- [`docs/bronze.md`](./docs/bronze.md)
+- [`docs/decisiones.md`](./docs/decisiones.md)
+
+### Ejecutar Bronze
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+docker exec bootcamp-jupyter python /home/jovyan/src/ingest/bronze_loader.py
+docker exec bootcamp-jupyter python /home/jovyan/src/validate_bronze.py
+```
+
+La misma versión de un archivo se omite mediante checksum. Una versión distinta crea un
+nuevo batch sin sobrescribir la evidencia anterior.
+
+---
+
 ## 2. Datos disponibles
 
 Los datos simulan tres sistemas de origen distintos sobre el mismo negocio (una institución que ofrece cursos y factura suscripciones). El esquema completo de cada archivo (columnas y filas) está documentado en [`manifest.json`](./manifest.json).
