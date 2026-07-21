@@ -21,6 +21,7 @@ x-airflow-common: &airflow-common
     - ./src:/opt/airflow/src
     - ./sql:/opt/airflow/sql
     - ./data:/opt/airflow/data
+    - ./manifest.json:/opt/airflow/manifest.json:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -46,7 +47,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-schemas.sql:/docker-entrypoint-initdb.d/01-init-schemas.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bootcamp -d datawarehouse"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -111,6 +112,11 @@ services:
     container_name: bootcamp-jupyter
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-bootcamp}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "8888:8888"
     volumes:
@@ -118,6 +124,7 @@ services:
       - ./data:/home/jovyan/data
       - ./src:/home/jovyan/src
       - ./sql:/home/jovyan/sql
+      - ./manifest.json:/home/jovyan/manifest.json:ro
     depends_on:
       postgres:
         condition: service_healthy
