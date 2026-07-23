@@ -3,7 +3,7 @@
 Crea (o reutiliza si ya existen — es idempotente):
   1. La conexión a la base de datos hacia la capa Gold.
   2. Un dataset por cada vista KPI de `gold`.
-  3. Los gráficos de negocio.
+  3. Nueve gráficos de negocio, organizados en cuatro secciones temáticas.
   4. El dashboard "KPIs — CRM · Billing · Universidad" con su layout.
 
 Sin este script el dashboard vive solo dentro del volumen del contenedor y se
@@ -21,6 +21,7 @@ Variables de entorno (con defaults):
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -42,7 +43,7 @@ SQLALCHEMY_URI = (
     f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 )
 
-# Datasets a materializar (todos en el schema gold).
+# Datasets a materializar (todos vistas del schema gold).
 KPI_VIEWS = [
     "kpi_revenue_monthly",
     "kpi_collection_by_currency",
@@ -51,6 +52,8 @@ KPI_VIEWS = [
     "kpi_sales_pipeline",
     "kpi_lead_funnel",
     "kpi_student_vs_external",
+    "kpi_mrr_breakdown",
+    "kpi_lead_by_source",
 ]
 
 
@@ -63,13 +66,14 @@ def _metric(column, label, aggregate="SUM"):
     }
 
 
-# Gráficos: (nombre, vista KPI, viz_type, params). El layout los ubica 2x2.
 def chart_specs(ds):
-    return [
-        {
-            "name": "Revenue mensual por moneda",
-            "dataset": ds["kpi_revenue_monthly"],
-            "viz_type": "echarts_timeseries_bar",
+    """Nueve gráficos. Las medidas ya-agregadas por fila (pct) usan MAX
+    (una fila por categoría), no SUM, para no sumar porcentajes."""
+    return {
+        # -------- Revenue y cobranza --------
+        "revenue_mensual": {
+            "name": "Revenue mensual por moneda (medida: items)",
+            "dataset": ds["kpi_revenue_monthly"], "viz_type": "echarts_timeseries_bar",
             "params": {
                 "x_axis": "month", "time_grain_sqla": "P1M",
                 "metrics": [_metric("revenue", "Revenue")],
@@ -77,20 +81,47 @@ def chart_specs(ds):
                 "color_scheme": "supersetColors",
             },
         },
-        {
-            "name": "Suscripciones por estado",
-            "dataset": ds["kpi_subscription_status"],
-            "viz_type": "pie",
+        "cobranza_moneda": {
+            "name": "Cobranza: % de facturas pagadas por moneda",
+            "dataset": ds["kpi_collection_by_currency"], "viz_type": "echarts_timeseries_bar",
             "params": {
-                "metric": _metric("subscriptions", "Suscripciones"),
+                "x_axis": "currency",
+                "metrics": [_metric("paid_pct", "% pagadas", "MAX")],
+                "row_limit": 100, "color_scheme": "supersetColors",
+            },
+        },
+        # -------- Suscripciones (MRR) --------
+        "mrr_breakdown": {
+            "name": "MRR real vs. en riesgo (63% del MRR activo ya venció)",
+            "dataset": ds["kpi_mrr_breakdown"], "viz_type": "echarts_timeseries_bar",
+            "params": {
+                "x_axis": "segmento",
+                "metrics": [_metric("mrr", "MRR", "MAX")],
+                "row_limit": 100, "color_scheme": "supersetColors",
+            },
+        },
+        "subs_estado": {
+            "name": "Suscripciones por estado",
+            "dataset": ds["kpi_subscription_status"], "viz_type": "pie",
+            "params": {
+                "metric": _metric("subscriptions", "Suscripciones", "MAX"),
                 "groupby": ["status"], "row_limit": 100,
                 "color_scheme": "supersetColors",
             },
         },
-        {
+        # -------- Académico --------
+        "aprobacion_depto": {
+            "name": "Tasa de aprobación por departamento (%)",
+            "dataset": ds["kpi_academic_by_department"], "viz_type": "echarts_timeseries_bar",
+            "params": {
+                "x_axis": "department",
+                "metrics": [_metric("pass_rate_pct", "% aprobación", "MAX")],
+                "row_limit": 100, "color_scheme": "supersetColors",
+            },
+        },
+        "academico_tabla": {
             "name": "Rendimiento académico por departamento",
-            "dataset": ds["kpi_academic_by_department"],
-            "viz_type": "table",
+            "dataset": ds["kpi_academic_by_department"], "viz_type": "table",
             "params": {
                 "query_mode": "raw",
                 "all_columns": ["department", "enrollments", "with_grades",
@@ -98,17 +129,52 @@ def chart_specs(ds):
                 "order_by_cols": [], "row_limit": 100,
             },
         },
-        {
-            "name": "Pipeline comercial por etapa",
-            "dataset": ds["kpi_sales_pipeline"],
-            "viz_type": "echarts_timeseries_bar",
+        # -------- CRM y cross-dominio --------
+        "pipeline_etapa": {
+            "name": "Pipeline comercial por etapa (monto)",
+            "dataset": ds["kpi_sales_pipeline"], "viz_type": "echarts_timeseries_bar",
             "params": {
                 "x_axis": "stage",
-                "metrics": [_metric("total_amount", "Monto total")],
+                "metrics": [_metric("total_amount", "Monto total", "MAX")],
                 "row_limit": 100, "color_scheme": "supersetColors",
             },
         },
-    ]
+        "leads_canal": {
+            "name": "Conversión de leads por canal (cold call gana)",
+            "dataset": ds["kpi_lead_by_source"], "viz_type": "echarts_timeseries_bar",
+            "params": {
+                "x_axis": "source",
+                "metrics": [_metric("conversion_pct", "% conversión", "MAX")],
+                "row_limit": 100, "color_scheme": "supersetColors",
+            },
+        },
+        "estudiante_externo": {
+            "name": "Facturación: estudiantes vs. externos",
+            "dataset": ds["kpi_student_vs_external"], "viz_type": "table",
+            "params": {
+                "query_mode": "raw",
+                "all_columns": ["customer_type", "customers", "invoices",
+                                "invoices_per_customer", "revenue_per_customer"],
+                "order_by_cols": [], "row_limit": 100,
+            },
+        },
+    }
+
+
+# Estructura del dashboard: (título de sección, [claves de gráficos]).
+SECTIONS = [
+    ("💰  Revenue y cobranza", ["revenue_mensual", "cobranza_moneda"]),
+    ("🔁  Suscripciones — MRR", ["mrr_breakdown", "subs_estado"]),
+    ("🎓  Rendimiento académico", ["aprobacion_depto", "academico_tabla"]),
+    ("📇  CRM y visión cross-dominio", ["pipeline_etapa", "leads_canal", "estudiante_externo"]),
+]
+
+INTRO_MD = (
+    "## KPIs — CRM · Billing · Universidad\n"
+    "Tablero sobre la capa **Gold** del pipeline medallion. "
+    "**Nota de medida:** el *revenue* usa la suma de items (`Σ line_total`); "
+    "el header (`invoices.total`) y los pagos suman ~1/5 — ver `docs/insights.md`."
+)
 
 
 class Superset:
@@ -127,7 +193,6 @@ class Superset:
         self.s.headers["Referer"] = SUPERSET_URL
 
     def _find(self, resource, col, value):
-        import json
         q = json.dumps({"filters": [{"col": col, "opr": "eq", "value": value}]})
         r = self.s.get(f"{SUPERSET_URL}/api/v1/{resource}/", params={"q": q})
         r.raise_for_status()
@@ -151,18 +216,14 @@ class Superset:
     def find_or_create_dataset(self, db_id, table):
         existing = self._find("dataset", "table_name", table)
         if existing:
-            print(f"dataset   reutilizado  {table} id={existing}")
             return existing
         r = self.s.post(f"{SUPERSET_URL}/api/v1/dataset/", json={
             "database": db_id, "schema": "gold", "table_name": table,
         })
         r.raise_for_status()
-        ds_id = r.json()["id"]
-        print(f"dataset   creado       {table} id={ds_id}")
-        return ds_id
+        return r.json()["id"]
 
-    def find_or_create_chart(self, spec):
-        import json
+    def find_or_create_chart(self, key, spec):
         existing = self._find("chart", "slice_name", spec["name"])
         params = {"datasource": f"{spec['dataset']}__table",
                   "viz_type": spec["viz_type"], **spec["params"]}
@@ -173,16 +234,14 @@ class Superset:
         }
         if existing:
             self.s.put(f"{SUPERSET_URL}/api/v1/chart/{existing}", json=payload).raise_for_status()
-            print(f"chart     actualizado  '{spec['name']}' id={existing}")
+            print(f"chart     actualizado  '{spec['name']}'")
             return existing
         r = self.s.post(f"{SUPERSET_URL}/api/v1/chart/", json=payload)
         r.raise_for_status()
-        cid = r.json()["id"]
-        print(f"chart     creado       '{spec['name']}' id={cid}")
-        return cid
+        print(f"chart     creado       '{spec['name']}'")
+        return r.json()["id"]
 
     def upsert_dashboard(self, chart_ids, position_json):
-        import json
         existing = self._find("dashboard", "dashboard_title", DASHBOARD_TITLE)
         payload = {
             "dashboard_title": DASHBOARD_TITLE, "published": True,
@@ -197,38 +256,61 @@ class Superset:
             r.raise_for_status()
             dash_id = r.json()["id"]
             print(f"dashboard creado       id={dash_id}")
-        # asegurar la asociación chart -> dashboard
         for cid in chart_ids:
             self.s.put(f"{SUPERSET_URL}/api/v1/chart/{cid}", json={"dashboards": [dash_id]})
         return dash_id
 
 
-def build_position(chart_ids, names):
-    """Layout 2x2: dos filas de dos gráficos (ancho 6, alto 50)."""
+def build_position(charts, specs):
+    """Layout con intro + una sección (HEADER) por tema, gráficos en filas de 2."""
     pos = {
         "DASHBOARD_VERSION_KEY": "v2",
         "ROOT_ID": {"type": "ROOT", "id": "ROOT_ID", "children": ["GRID_ID"]},
         "GRID_ID": {"type": "GRID", "id": "GRID_ID", "parents": ["ROOT_ID"], "children": []},
-        "HEADER_ID": {"type": "HEADER", "id": "HEADER_ID",
-                      "meta": {"text": DASHBOARD_TITLE}},
+        "HEADER_ID": {"type": "HEADER", "id": "HEADER_ID", "meta": {"text": DASHBOARD_TITLE}},
     }
-    for row in range(0, len(chart_ids), 2):
-        row_id = f"ROW-{row // 2}"
-        pos["GRID_ID"]["children"].append(row_id)
-        children = []
-        for cid, name in zip(chart_ids[row:row + 2], names[row:row + 2]):
-            node_id = f"CHART-{cid}"
-            children.append(node_id)
-            pos[node_id] = {
-                "type": "CHART", "id": node_id, "children": [],
-                "parents": ["ROOT_ID", "GRID_ID", row_id],
-                "meta": {"chartId": cid, "width": 6, "height": 50, "sliceName": name},
-            }
-        pos[row_id] = {
-            "type": "ROW", "id": row_id, "children": children,
+    grid = pos["GRID_ID"]["children"]
+
+    # Intro (markdown a ancho completo)
+    pos["MD-intro"] = {
+        "type": "MARKDOWN", "id": "MD-intro", "children": [],
+        "parents": ["ROOT_ID", "GRID_ID"],
+        "meta": {"code": INTRO_MD, "width": 12, "height": 22},
+    }
+    grid.append("MD-intro")
+
+    for si, (title, keys) in enumerate(SECTIONS):
+        head_id = f"HEAD-{si}"
+        pos[head_id] = {
+            "type": "HEADER", "id": head_id, "children": [],
             "parents": ["ROOT_ID", "GRID_ID"],
-            "meta": {"background": "BACKGROUND_TRANSPARENT"},
+            "meta": {"text": title, "headerSize": "MEDIUM_HEADER",
+                     "background": "BACKGROUND_TRANSPARENT"},
         }
+        grid.append(head_id)
+
+        # gráficos de la sección en filas de a 2
+        for ri in range(0, len(keys), 2):
+            row_keys = keys[ri:ri + 2]
+            row_id = f"ROW-{si}-{ri}"
+            width = 12 // len(row_keys)
+            children = []
+            for k in row_keys:
+                cid = charts[k]
+                node = f"CHART-{cid}"
+                children.append(node)
+                pos[node] = {
+                    "type": "CHART", "id": node, "children": [],
+                    "parents": ["ROOT_ID", "GRID_ID", row_id],
+                    "meta": {"chartId": cid, "width": width, "height": 50,
+                             "sliceName": specs[k]["name"]},
+                }
+            pos[row_id] = {
+                "type": "ROW", "id": row_id, "children": children,
+                "parents": ["ROOT_ID", "GRID_ID"],
+                "meta": {"background": "BACKGROUND_TRANSPARENT"},
+            }
+            grid.append(row_id)
     return pos
 
 
@@ -238,21 +320,21 @@ def main():
 
     db_id = api.find_or_create_database()
     ds = {v: api.find_or_create_dataset(db_id, v) for v in KPI_VIEWS}
+    print(f"datasets  {len(ds)} listos")
 
     specs = chart_specs(ds)
-    chart_ids = [api.find_or_create_chart(spec) for spec in specs]
-    names = [spec["name"] for spec in specs]
+    charts = {key: api.find_or_create_chart(key, spec) for key, spec in specs.items()}
 
-    position = build_position(chart_ids, names)
-    dash_id = api.upsert_dashboard(chart_ids, position)
+    position = build_position(charts, specs)
+    dash_id = api.upsert_dashboard(list(charts.values()), position)
 
     print(f"\nDashboard listo: {SUPERSET_URL}/superset/dashboard/{dash_id}/")
-    print(f"({len(ds)} datasets, {len(chart_ids)} gráficos)")
+    print(f"({len(ds)} datasets, {len(charts)} gráficos, {len(SECTIONS)} secciones)")
 
 
 if __name__ == "__main__":
     try:
         main()
     except requests.HTTPError as exc:
-        print(f"ERROR HTTP: {exc}\n{exc.response.text[:300]}", file=sys.stderr)
+        print(f"ERROR HTTP: {exc}\n{exc.response.text[:400]}", file=sys.stderr)
         sys.exit(1)

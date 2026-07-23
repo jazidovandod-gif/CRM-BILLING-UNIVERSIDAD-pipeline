@@ -253,3 +253,27 @@ SELECT CASE WHEN d.is_student THEN 'estudiante' ELSE 'externo' END AS customer_t
 FROM gold.dim_customer d
 LEFT JOIN gold.fact_invoice f ON d.customer_id = f.customer_id
 GROUP BY 1;
+
+-- MRR: reportado (todas las activas) vs. real (vigentes) vs. en riesgo (vencidas).
+-- Materializa el insight central de suscripciones: el 63% del MRR "activo" ya venció.
+CREATE OR REPLACE VIEW gold.kpi_mrr_breakdown AS
+SELECT 'MRR real (vigente)' AS segmento,
+       count(*) FILTER (WHERE status = 'active' AND NOT is_effectively_expired)  AS suscripciones,
+       round(sum(monthly_price) FILTER (
+             WHERE status = 'active' AND NOT is_effectively_expired), 2)         AS mrr
+FROM gold.fact_subscription
+UNION ALL
+SELECT 'MRR en riesgo (activa vencida)',
+       count(*) FILTER (WHERE status = 'active' AND is_effectively_expired),
+       round(sum(monthly_price) FILTER (
+             WHERE status = 'active' AND is_effectively_expired), 2)
+FROM gold.fact_subscription;
+
+-- Embudo de leads por canal de origen (soporta el insight cold_call > web).
+CREATE OR REPLACE VIEW gold.kpi_lead_by_source AS
+SELECT source,
+       count(*)                                      AS leads,
+       count(*) FILTER (WHERE is_converted)          AS convertidos,
+       round(100.0 * count(*) FILTER (WHERE is_converted) / count(*), 1) AS conversion_pct
+FROM gold.fact_lead
+GROUP BY 1;

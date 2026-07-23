@@ -56,7 +56,9 @@ erDiagram
 | `kpi_subscription_status` | Suscripciones por estado y MRR activo |
 | `kpi_sales_pipeline` | Oportunidades y monto por etapa (habilita win rate) |
 | `kpi_lead_funnel` | Embudo de leads por estado |
+| `kpi_lead_by_source` | Conversión de leads por canal de origen |
 | `kpi_student_vs_external` | Facturación de estudiantes vs. clientes externos |
+| `kpi_mrr_breakdown` | MRR real (vigente) vs. en riesgo (activa vencida) |
 
 ## Definiciones y convenciones
 
