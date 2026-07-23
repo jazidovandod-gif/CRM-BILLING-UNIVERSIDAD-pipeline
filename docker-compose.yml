@@ -132,12 +132,56 @@ services:
     networks:
       - bootcamp-network
 
+  # ──────────────────────────────────────────
+  # Superset — Dashboard sobre la capa Gold (puerto 8088)
+  # ──────────────────────────────────────────
+  superset:
+    image: apache/superset:3.1.1
+    container_name: bootcamp-superset
+    env_file:
+      - .env
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    ports:
+      - "8088:8088"
+    volumes:
+      - superset_home:/app/superset_home
+    command:
+      - /bin/bash
+      - -c
+      # set -e aborta ante cualquier fallo real; el "|| true" protege SOLO a
+      # create-admin (falla si el usuario ya existe, que es el caso esperado
+      # en reinicios). Lección aprendida del bug de airflow-init.
+      - |
+        set -e
+        superset db upgrade
+        superset fab create-admin \
+          --username admin --password admin \
+          --firstname Admin --lastname User \
+          --email admin@superset.local || true
+        superset init
+        /usr/bin/run-server.sh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+
 # ──────────────────────────────────────────
 # Volúmenes persistentes
 # ──────────────────────────────────────────
 volumes:
   postgres_data:
     name: bootcamp-postgres-data
+  superset_home:
+    name: bootcamp-superset-home
 
 # ──────────────────────────────────────────
 # Red compartida
