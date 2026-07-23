@@ -31,8 +31,9 @@ Avance verificado al 2026-07-23:
 - **Gold** en PostgreSQL: modelo estrella (7 dimensiones + 7 hechos) y 7 vistas de KPI. Validador con 32 comprobaciones OK.
 - **DAG de Airflow** (`pipeline_medallion`): CSV → Bronze (paralelo por dominio) → Silver → Gold → Parquet, con validadores como gates. Corrida completa 12/12 tareas en verde.
 - **Parquet**: Silver y Gold exportadas (40 objetos) con validación de paridad archivo↔tabla.
-- **Dashboard Superset**: conexión a Gold, 7 datasets KPI, 4 gráficos y dashboard publicado.
-- Pendientes: notebook de análisis sobre Gold, insights y presentación ejecutiva.
+- **Dashboard Superset**: aprovisionado por código (`src/dashboard/provision_superset.py`) — conexión a Gold, 7 datasets KPI, 4 gráficos y dashboard publicado.
+- **Análisis**: 2 notebooks ejecutados (discovery + pipeline/KPIs) y 21 insights de negocio verificados.
+- Pendiente: presentación ejecutiva (PPT).
 
 ### Accesos
 
@@ -48,6 +49,8 @@ Documentación principal:
 - [`docs/calidad-datos.md`](./docs/calidad-datos.md) — hallazgos de calidad y acciones
 - [`docs/bronze.md`](./docs/bronze.md) · [`docs/silver.md`](./docs/silver.md) · [`docs/modelo-gold.md`](./docs/modelo-gold.md) — capas
 - [`docs/decisiones.md`](./docs/decisiones.md) — bitácora de decisiones justificadas
+- [`docs/insights.md`](./docs/insights.md) — insights de negocio verificados
+- [`notebooks/01_discovery.ipynb`](./notebooks/01_discovery.ipynb) · [`notebooks/02_pipeline_y_kpis.ipynb`](./notebooks/02_pipeline_y_kpis.ipynb) — análisis
 - [`docs/analisis-datos-completo.md`](./docs/analisis-datos-completo.md) — auditoría reproducible
 
 ### Ejecutar el pipeline
@@ -75,7 +78,15 @@ docker exec bootcamp-airflow-scheduler airflow dags trigger pipeline_medallion
 
 (También desde la UI en http://localhost:8080 → DAG `pipeline_medallion` → Trigger.)
 
-Todo el pipeline es reejecutable sin duplicar datos: Bronze omite archivos sin cambios por checksum y Silver/Gold/Parquet reconstruyen su estado completo.
+Finalmente, **aprovisionar el dashboard** de Superset (idempotente; requiere que Gold ya exista, es decir tras la primera corrida del pipeline):
+
+```powershell
+docker exec bootcamp-jupyter python /home/jovyan/src/dashboard/provision_superset.py
+```
+
+Crea la conexión a Gold, los 7 datasets KPI, los gráficos y el dashboard "KPIs — CRM · Billing · Universidad" en http://localhost:8088.
+
+Todo el pipeline es reejecutable sin duplicar datos: Bronze omite archivos sin cambios por checksum y Silver/Gold/Parquet reconstruyen su estado completo. El aprovisionamiento del dashboard reutiliza los objetos existentes en vez de duplicarlos.
 
 ---
 

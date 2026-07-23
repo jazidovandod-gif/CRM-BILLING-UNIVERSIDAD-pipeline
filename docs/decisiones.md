@@ -94,6 +94,15 @@ Bitácora de decisiones técnicas no obvias tomadas durante el proyecto: qué se
 
 ---
 
+## [2026-07-24] Dashboard como código: aprovisionamiento reproducible de Superset
+
+- **Contexto:** el dashboard se había creado con llamadas a la API de Superset ejecutadas manualmente. Vivía solo dentro del volumen del contenedor: al recrearlo (o al levantar el proyecto desde cero) se perdía por completo. Eso rompía la reproducibilidad y dejaba el entregable "dashboard" fuera del control de versiones.
+- **Decisión:** `src/dashboard/provision_superset.py` reconstruye todo el dashboard vía la REST API de Superset, de forma **idempotente** (busca-o-crea cada objeto por nombre: conexión a Gold, 7 datasets KPI, 4 gráficos, dashboard con `position_json` explícito para el layout 2×2). Reejecutarlo actualiza en vez de duplicar. Se documenta como paso final del arranque desde cero (tras la primera corrida del pipeline, que crea las vistas de Gold). No se cablea como servicio automático del compose porque depende de que Gold ya exista (lo produce el DAG), y esa dependencia de orden sería frágil en `depends_on`.
+- **Alternativas descartadas:** exportar el dashboard como ZIP de assets de Superset e importarlo (rechazado: el ZIP es un artefacto opaco, menos legible y editable que el script; y hardcodea IDs); un servicio `superset-init` en el compose (rechazado: no puede garantizar que el DAG ya haya poblado Gold antes de correr).
+- **Impacto:** `src/dashboard/provision_superset.py`, README (paso de aprovisionamiento). El dashboard ahora se reconstruye desde el repo en cualquier ambiente.
+
+---
+
 ## [2026-07-20] Fix: Airflow no migraba su base de datos (conflicto de versión SQLAlchemy)
 
 - **Contexto:** al levantar el stack con `docker compose up`, `docker ps` mostraba `airflow-webserver` y `airflow-scheduler` como "Up", pero `http://localhost:8080` no respondía (timeout). El contenedor `airflow-init` terminaba con exit code 0 pese a que `airflow db migrate` fallaba realmente con `sqlalchemy.exc.ArgumentError: Invalid value for 'executemany_mode': 'values'`. El comando del contenedor era `airflow db migrate && airflow users create ... || true`: por precedencia de operadores en bash, `(A && B) || C` — si `A` (migrate) fallaba, la cadena caía en `|| true`, enmascarando el fallo real y dejando el contenedor en estado "exitoso" falso. Webserver y scheduler quedaban en loop infinito de reintento contra una base de datos nunca migrada.
