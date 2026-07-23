@@ -53,6 +53,15 @@ Bitácora de decisiones técnicas no obvias tomadas durante el proyecto: qué se
 
 ---
 
+## [2026-07-24] Revenue: transparencia sobre tres medidas que no concilian (5×)
+
+- **Contexto:** una revisión de QA independiente detectó que las cifras de revenue de `docs/insights.md` (medida de items) son ~5× las que se obtienen sumando `invoices.total`. Verificado contra los CSV crudos: header `Σ invoices.total` = 6,79M ≈ `Σ payments` = 6,49M (0,96×), pero `Σ items line_total` = 34,93M (5,14×). Las tres "fuentes de verdad" del revenue divergen radicalmente.
+- **Decisión:** se mantiene `invoiced_amount` = suma de items como medida del modelo (coherente con Gold, KPIs y dashboard; los items son internamente consistentes `line_total = qty·unit`), **pero se documenta explícitamente la divergencia**: nota crítica al inicio de la sección 1 de `insights.md`, nuevo Insight 0 (en el doc y en el notebook, calculado en vivo) que presenta las tres medidas, y aclaración de escala (÷5 a header/pagos) donde el monto absoluto importa. Las conclusiones de tendencia y mix son proporcionales y no dependen de la medida.
+- **Alternativas descartadas:** cambiar la medida del modelo a header/pagos (rechazado: rompería Gold/dashboard el día previo a la presentación, y el header está descorrelacionado de los items por factura — no es "más verdadero", solo más chico); ocultar la divergencia y quedarse solo con items (rechazado: un evaluador reproduce `invoices.total` y ve 1/5 — la transparencia convierte la debilidad del dato en evidencia de criterio).
+- **Impacto:** `docs/insights.md` (nota de medida + Insight 0 + escalas), `notebooks/02_pipeline_y_kpis.ipynb` (Insight 0 en vivo). El modelo Gold no cambia (ya publicaba `total_reported`, `invoiced_amount` y pagos por separado).
+
+---
+
 ## [2026-07-22] Gold: modelo estrella y definiciones de KPI
 
 - **Contexto:** hay que exponer los datos limpios para analítica y dashboard (Superset), habilitando los KPIs de negocio con definiciones inequívocas.
