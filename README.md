@@ -21,15 +21,27 @@ No existe una única solución correcta. Se evalúa el criterio, la trazabilidad
 
 ## Estado actual del proyecto
 
-Avance verificado al 2026-07-22:
+Avance verificado al 2026-07-23:
 
-- Infraestructura Docker operativa: PostgreSQL, Airflow y Jupyter.
+- Infraestructura Docker operativa: PostgreSQL, Airflow, Jupyter y Superset.
 - Discovery ejecutado sobre los 18 CSV y 446,708 filas.
 - Auditoría reproducible de PK, FK, calidad semántica y relaciones cross-domain.
 - **Bronze** en PostgreSQL: 18 tablas fuente + tabla de control; carga idempotente reconciliada 446,708/446,708.
 - **Silver** en PostgreSQL: 18 tablas tipadas + 1 derivada, con una columna-flag por hallazgo del discovery. Validador con 51 comprobaciones OK.
 - **Gold** en PostgreSQL: modelo estrella (7 dimensiones + 7 hechos) y 7 vistas de KPI. Validador con 32 comprobaciones OK.
-- Pendientes: DAG de Airflow, exportación a Parquet, dashboard (Superset) y presentación.
+- **DAG de Airflow** (`pipeline_medallion`): CSV → Bronze (paralelo por dominio) → Silver → Gold → Parquet, con validadores como gates. Corrida completa 12/12 tareas en verde.
+- **Parquet**: Silver y Gold exportadas (40 objetos) con validación de paridad archivo↔tabla.
+- **Dashboard Superset**: conexión a Gold, 7 datasets KPI, 4 gráficos y dashboard publicado.
+- Pendientes: notebook de análisis sobre Gold, insights y presentación ejecutiva.
+
+### Accesos
+
+| Servicio | URL | Credenciales |
+|---|---|---|
+| Airflow | http://localhost:8080 | admin / admin |
+| Jupyter | http://localhost:8888 | token `bootcamp` |
+| Superset | http://localhost:8088 | admin / admin |
+| PostgreSQL | localhost:5432 | bootcamp / bootcamp2024 (`datawarehouse`) |
 
 Documentación principal:
 
@@ -55,7 +67,15 @@ docker exec bootcamp-jupyter python /home/jovyan/src/validate_silver.py
 docker exec bootcamp-jupyter python /home/jovyan/src/validate_gold.py
 ```
 
-Todo el pipeline es reejecutable sin duplicar datos.
+O bien, **todo el pipeline con una sola orden** vía Airflow (recomendado):
+
+```powershell
+docker exec bootcamp-airflow-scheduler airflow dags trigger pipeline_medallion
+```
+
+(También desde la UI en http://localhost:8080 → DAG `pipeline_medallion` → Trigger.)
+
+Todo el pipeline es reejecutable sin duplicar datos: Bronze omite archivos sin cambios por checksum y Silver/Gold/Parquet reconstruyen su estado completo.
 
 ---
 

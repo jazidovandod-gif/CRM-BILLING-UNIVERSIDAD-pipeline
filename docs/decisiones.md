@@ -67,6 +67,33 @@ Bitácora de decisiones técnicas no obvias tomadas durante el proyecto: qué se
 
 ---
 
+## [2026-07-23] Orquestación: un DAG con validadores como gates, reusando los scripts existentes
+
+- **Contexto:** fases 10–12 de la consigna (automatización, export Parquet, validación del pipeline). Toda la lógica ya existía como scripts probados individualmente; el riesgo era duplicarla dentro del DAG.
+- **Decisión:** `dags/pipeline_medallion.py` orquesta con `BashOperator` los scripts existentes (`bronze_loader.py`, `run_sql.py`, `validate_*.py`) sin duplicar lógica. Cada capa está protegida por su validador como *gate*: si una validación falla, el pipeline se detiene antes de propagar datos malos. La ingesta Bronze se paraleliza por dominio (fan-out de 3 tareas) tras aplicar el DDL una sola vez. `schedule=None` (fuentes estáticas, ejecución bajo demanda), documentado que con fuentes vivas bastaría un `@daily`. `retries=1` con `retry_delay` de 2 min.
+- **Alternativas descartadas:** `PythonOperator` importando las funciones (rechazado: acopla el parseo del DAG a imports pesados como pandas y duplica el manejo de entorno); reescribir la lógica dentro del DAG (rechazado: dos fuentes de verdad); un DAG por capa (rechazado: las dependencias entre capas son exactamente lo que el grafo debe expresar).
+- **Impacto:** `dags/pipeline_medallion.py`. Corrida completa verificada en Airflow: 12/12 tareas success, con Bronze omitiendo por checksum (idempotencia demostrada en el propio run).
+
+---
+
+## [2026-07-23] Exportación Parquet: Silver y Gold completas, con validación de paridad
+
+- **Contexto:** la consigna define Parquet como formato de exportación de las capas finales; la guía v2 lo deja opcional pero valora la justificación.
+- **Decisión:** `src/export/parquet_exporter.py` exporta todas las tablas de Silver y Gold (más las vistas KPI de Gold) a `data/parquet/{silver,gold}/` con compresión snappy, y `src/validate_parquet.py` valida paridad archivo↔tabla (conteos por relación + sumas de medidas clave) como última tarea del DAG. Los archivos exportados se versionan en el repo (13 MB) porque son un entregable explícito. El exportador tolera ejecuciones desde contenedores con distinto UID (Airflow 50000 / Jupyter 1000) sobre el mismo bind mount: directorio permisivo + unlink previo — un `PermissionError` real detectado en la primera corrida del DAG.
+- **Alternativas descartadas:** exportar solo Gold (rechazado: Silver exportado permite reconstruir análisis sin acceso a Postgres); particionar por fecha (rechazado: volúmenes chicos, la partición agregaría complejidad sin beneficio de lectura).
+- **Impacto:** `src/export/parquet_exporter.py`, `src/validate_parquet.py`, tareas `exportar_parquet`/`validar_parquet` del DAG, `data/parquet/`.
+
+---
+
+## [2026-07-23] Dashboard: Superset en Docker, aprovisionado por API
+
+- **Contexto:** la guía v2 agrega el dashboard como entregable (10%), sugiriendo Power BI u otra herramienta. El usuario eligió Superset.
+- **Decisión:** servicio `superset` (imagen oficial 3.1.1 fijada) en el mismo `docker-compose`, conectado a la capa Gold por la red interna. Metadata propia de Superset en volumen dedicado (SQLite) para no ensuciar el data warehouse. `SUPERSET_SECRET_KEY` desde `.env`. En el comando de arranque, `|| true` protege **solo** a `create-admin` (falla esperada en reinicios si el usuario ya existe) con `set -e` para el resto — lección aprendida del bug de `airflow-init`. La conexión a la base, los 7 datasets (vistas KPI), 4 gráficos y el dashboard se aprovisionaron vía REST API, y se verificó con queries reales que cada gráfico devuelve datos.
+- **Alternativas descartadas:** Power BI Desktop (rechazado: no es reproducible dentro del compose, requiere instalación y licencia en Windows); Metabase (más liviano, pero el usuario prefirió Superset); metadata de Superset en el Postgres del proyecto (rechazado: mezcla metadata de herramienta con el warehouse).
+- **Impacto:** `docker-compose.yml`, `.env`/`.env.example`, dashboard "KPIs — CRM · Billing · Universidad" en `http://localhost:8088` (admin/admin).
+
+---
+
 ## [2026-07-20] Fix: Airflow no migraba su base de datos (conflicto de versión SQLAlchemy)
 
 - **Contexto:** al levantar el stack con `docker compose up`, `docker ps` mostraba `airflow-webserver` y `airflow-scheduler` como "Up", pero `http://localhost:8080` no respondía (timeout). El contenedor `airflow-init` terminaba con exit code 0 pese a que `airflow db migrate` fallaba realmente con `sqlalchemy.exc.ArgumentError: Invalid value for 'executemany_mode': 'values'`. El comando del contenedor era `airflow db migrate && airflow users create ... || true`: por precedencia de operadores en bash, `(A && B) || C` — si `A` (migrate) fallaba, la cadena caía en `|| true`, enmascarando el fallo real y dejando el contenedor en estado "exitoso" falso. Webserver y scheduler quedaban en loop infinito de reintento contra una base de datos nunca migrada.
