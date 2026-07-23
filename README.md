@@ -21,34 +21,41 @@ No existe una única solución correcta. Se evalúa el criterio, la trazabilidad
 
 ## Estado actual del proyecto
 
-Avance verificado al 2026-07-21:
+Avance verificado al 2026-07-22:
 
 - Infraestructura Docker operativa: PostgreSQL, Airflow y Jupyter.
 - Discovery ejecutado sobre los 18 CSV y 446,708 filas.
 - Auditoría reproducible de PK, FK, calidad semántica y relaciones cross-domain.
-- Capa Bronze implementada en PostgreSQL: 18 tablas fuente y una tabla de control.
-- Primera carga reconciliada: 446,708/446,708 filas.
-- Reejecución idempotente: 0 filas duplicadas.
-- Silver, Gold, DAG de Airflow y exportación Parquet todavía pendientes.
+- **Bronze** en PostgreSQL: 18 tablas fuente + tabla de control; carga idempotente reconciliada 446,708/446,708.
+- **Silver** en PostgreSQL: 18 tablas tipadas + 1 derivada, con una columna-flag por hallazgo del discovery. Validador con 51 comprobaciones OK.
+- **Gold** en PostgreSQL: modelo estrella (7 dimensiones + 7 hechos) y 7 vistas de KPI. Validador con 32 comprobaciones OK.
+- Pendientes: DAG de Airflow, exportación a Parquet, dashboard (Superset) y presentación.
 
 Documentación principal:
 
-- [`docs/calidad-datos.md`](./docs/calidad-datos.md)
-- [`docs/analisis-datos-completo.md`](./docs/analisis-datos-completo.md)
-- [`docs/bronze.md`](./docs/bronze.md)
-- [`docs/decisiones.md`](./docs/decisiones.md)
+- [`docs/calidad-datos.md`](./docs/calidad-datos.md) — hallazgos de calidad y acciones
+- [`docs/bronze.md`](./docs/bronze.md) · [`docs/silver.md`](./docs/silver.md) · [`docs/modelo-gold.md`](./docs/modelo-gold.md) — capas
+- [`docs/decisiones.md`](./docs/decisiones.md) — bitácora de decisiones justificadas
+- [`docs/analisis-datos-completo.md`](./docs/analisis-datos-completo.md) — auditoría reproducible
 
-### Ejecutar Bronze
+### Ejecutar el pipeline
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up -d --build
+
+# Bronze: ingesta idempotente de los 18 CSV (omite por checksum si no cambiaron)
 docker exec bootcamp-jupyter python /home/jovyan/src/ingest/bronze_loader.py
 docker exec bootcamp-jupyter python /home/jovyan/src/validate_bronze.py
+
+# Silver + Gold: DDL + transformaciones (idempotentes, en una transacción por script)
+docker exec bootcamp-jupyter python /home/jovyan/src/run_sql.py `
+  sql/silver/ddl.sql sql/silver/transform.sql sql/gold/ddl.sql sql/gold/load.sql
+docker exec bootcamp-jupyter python /home/jovyan/src/validate_silver.py
+docker exec bootcamp-jupyter python /home/jovyan/src/validate_gold.py
 ```
 
-La misma versión de un archivo se omite mediante checksum. Una versión distinta crea un
-nuevo batch sin sobrescribir la evidencia anterior.
+Todo el pipeline es reejecutable sin duplicar datos.
 
 ---
 
