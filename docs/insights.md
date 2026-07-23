@@ -14,15 +14,15 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 | 2 | **30% de lo facturado está en la calle**, con ~900 días de mora promedio | USD 3,2M + CLP 3,1M sin cobrar |
 | 3 | **El tier más barato sostiene el negocio** — basic 43% del revenue, enterprise 9% | Mismo orden en las 8 monedas |
 | 4 | **Cold call convierte 1,7× mejor que web** y el lead score no discrimina (50,8 vs 50,0) | 14,7% vs 8,5% de conversión |
-| 5 | **6.035 facturas sin respaldo documental** (sin items o "pagadas" sin pago) | Riesgo de auditoría directo |
+| 5 | **5.859 facturas sin respaldo documental** (sin items o "pagadas" sin pago) | Riesgo de auditoría directo |
 
 ---
 
 ## 1. Revenue y facturación
 
 ### 1.1 Revenue estancado 4 años, sin estacionalidad 🎲
-- **Evidencia:** USD: 2.620.555 (2022) → 2.715.133 (2023) → 2.770.977 (2024) → 2.587.455 (2025): −6,6% vs pico 2024, −1,3% vs 2022. CLP −6,7% en el período. EUR +2,7%, MXN +6,6%. Rango mensual USD 815K–992K sin patrón estacional.
-- **Interpretación:** el negocio no crece; las dos plazas principales (USD y CLP, ~50% de las facturas) cierran 2025 por debajo de 2022.
+- **Evidencia:** USD: 2.620.555 (2022) → 2.715.133 (2023) → 2.770.977 (2024) → 2.587.455 (2025): −6,6% vs pico 2024, −1,3% vs 2022. CLP −6,7% en el período. EUR +2,7%, MXN +6,6%. Rango mensual USD 178K–264K sin patrón estacional.
+- **Interpretación:** el negocio no crece; las dos plazas principales (USD y CLP, 60,5% de las facturas) cierran 2025 por debajo de 2022.
 - **Acción:** priorizar iniciativas de crecimiento (upsell de tiers) sobre optimización estacional, que no aplica.
 
 ### 1.2 30% de lo facturado sin cobrar, mora promedio ~900 días 🎲
@@ -40,9 +40,9 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 - **Interpretación:** la segmentación no se traduce en monetización — el revenue depende del volumen retail.
 - **Acción:** auditar la política de precios por segmento o sincerar la segmentación.
 
-### 1.5 Riesgo de auditoría: 6.035 facturas sin respaldo 🎲
-- **Evidencia:** 2.502 facturas **sin ningún item** (USD 104.317; CLP 112.646; resto ~129K) + 3.533 facturas `paid` **sin ningún pago registrado** (USD 763.741; CLP 736.506; resto ~1,04M).
-- **Interpretación:** 5% de las facturas no puede probar qué se vendió y 10% de las "cobradas" no puede probar que se cobró.
+### 1.5 Riesgo de auditoría: 5.859 facturas sin respaldo 🎲
+- **Evidencia:** 2.502 facturas **sin ningún item** (USD 104.317; CLP 112.646; resto ~129K) + 3.533 facturas `paid` **sin ningún pago registrado** (USD 763.741; CLP 736.506; resto ~1,04M). Los dos conjuntos se solapan en 176 facturas → **5.859 facturas únicas** afectadas. Además, de las 34.966 facturas marcadas `paid`, **solo 8 (0,023%) cuadran exacto** con sus pagos: 20.482 están sobrepagadas, 10.943 pagadas de menos y 3.533 sin ningún pago.
+- **Interpretación:** 5% de las facturas no puede probar qué se vendió y 10% de las "cobradas" no puede probar que se cobró; y de las que sí tienen pago, prácticamente ninguna concilia con el monto facturado.
 - **Acción:** cuarentenar en reporte de excepciones y excluir del revenue "confirmado"; en origen, bloquear facturas sin líneas y derivar `paid` solo de pagos registrados (el modelo ya expone `payment_status_derived`).
 
 ---
@@ -50,7 +50,7 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 ## 2. Suscripciones y revenue recurrente
 
 ### 2.1 ⭐ El MRR real es 194,7K, no 532,5K: el 63% del MRR "activo" ya venció
-- **Evidencia:** de 11.272 suscripciones `active` (MRR nominal 532.490), 7.146 tienen `end_date` vencida y aportan 337.817 (63,4%). Solo 4.126 están vigentes: **MRR real 194.674**. Del vencido: 2.229 contratos vencieron en 2024, 2.809 en 2025, 1.525 en 2026.
+- **Evidencia:** de 11.272 suscripciones `active` (MRR nominal 532.490), 7.146 tienen `end_date` vencida y aportan 337.817 (63,4%). Solo 4.126 están vigentes: **MRR real 194.674**. Del vencido: 2.229 contratos vencieron en 2024, 2.809 en 2025, 1.525 en 2026 y 583 tienen rango de fechas inválido (`end_date` anulada en Silver) — total 7.146.
 - **Interpretación:** cualquier dashboard que sume por status reporta un MRR ~3× inflado; 3.745 contratos llevan más de un año vencidos sin cerrar ni renovar (5.038 vencieron durante 2024–2025).
 - **Acción:** KPI oficial de MRR = `active AND NOT is_effectively_expired`. Campaña de renovación empezando por los 1.525 vencidos en 2026 (73.053 de MRR recuperable, vencimiento reciente).
 
@@ -84,7 +84,7 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 - **Acción:** no construir rankings; en producción, monitorear la dispersión entre cursos como señal de salud del dato.
 
 ### 3.2 ⭐ 1.303 inscripciones "completed" sin ninguna nota (8,7%)
-- **Evidencia:** de 14.931 completed, 1.303 no tienen ninguna evaluación registrada. Rango por semestre: 7,99%–9,31% — estructural en los 8 semestres, con leve mejora en 2025.
+- **Evidencia:** de 14.931 completed en `silver.university_enrollments`, 1.303 no tienen ninguna evaluación registrada (8,73%). Rango por semestre: 7,99%–9,31% — estructural en los 8 semestres, con leve mejora en 2025. (En `gold.fact_enrollment`, tras el dedupe, hay 14.924 completed; el conteo de actas sin nota no cambia.)
 - **Interpretación:** cierre de actas incompleto: 1 de cada 11 cursos "aprobados" no tiene respaldo académico.
 - **Acción:** regla de negocio en origen: no cerrar como `completed` sin al menos una nota; regularizar el backlog de 1.303 actas.
 
@@ -94,8 +94,8 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 - **Acción:** fijar 20% como línea base con meta (−2 pts en 2 semestres); alerta temprana sobre las ~5.000 `active` del semestre en curso.
 
 ### 3.4 El status está desacoplado de las notas 🎲
-- **Evidencia:** promedio de nota final por status: completed 74,90 / **failed 74,55** / dropped 74,94. El 91% de los dropped tiene nota final completa.
-- **Interpretación:** un "reprobado" rinde igual que un "aprobado" — status y nota cuentan historias contradictorias (artefacto), y no pueden usarse juntos sin regla de precedencia.
+- **Evidencia:** promedio de nota final por status: completed 74,90 / **failed 74,55** / dropped 74,94. El 91% de los dropped tiene nota final completa. Más contundente aún: de los 2.526 `failed`, **2.179 (94,5% de los que tienen nota) tienen nota final ≥ 60**, es decir aprobatoria.
+- **Interpretación:** un "reprobado" no solo rinde igual que un "aprobado" — el 94,5% directamente aprobó por nota. Status y nota cuentan historias contradictorias (artefacto), y no pueden usarse juntos sin regla de precedencia.
 - **Acción:** contrato de datos: `status` es la fuente de verdad para retención; check de consistencia (failed ⇒ nota < umbral) en el validador de Silver para producción.
 
 ### 3.5 Sin saturación de cursos: carga uniforme (~10 alumnos/sección)
@@ -133,6 +133,24 @@ Hallazgos accionables obtenidos consultando el modelo Gold. **Método:** cada in
 - **Evidencia:** conversión global 10,3% (205/2.000). Por canal: cold_call 14,7% > referral 11,4% > event 10,6% > ads 9,9% > **web 8,5%** (que aporta el 40% del volumen). Score promedio: convertidos 50,8 vs no convertidos 50,0.
 - **Interpretación:** el canal de mayor volumen es el que peor convierte, y el modelo de scoring no discrimina en absoluto: priorizar por canal es hoy más efectivo que priorizar por score. (n de cold_call = 204: ventaja direccional.)
 - **Acción:** reasignar presupuesto hacia contacto directo o mejorar la calificación del tráfico web; reconstruir el lead scoring.
+
+---
+
+## Anexo — hallazgos de calidad de datos (verificados)
+
+Estos no son insights de negocio *per se*, pero cuantifican la magnitud de la ruptura semántica del dataset y sostienen la tesis "flaggear en vez de borrar". Todos verificados contra la base:
+
+| Hallazgo | Magnitud |
+|---|---|
+| Facturas cuyo `total` de cabecera ≠ suma de líneas | **47.497 de 47.498** con items (~100%) |
+| Relaciones `opportunity_contacts` con contacto de otra cuenta | **5.995 de 6.000** (99,9%) — la tabla es inutilizable para atribución |
+| Actividades comerciales huérfanas (sin contacto ni oportunidad) | **2.981 de 20.000** (14,9%) |
+| Cursos con profesor de otro departamento | **264 de 300** (88%) |
+| Inscripciones (supervivientes) con `enrolled_at` fuera del semestre | **22.708 de 24.977** (90,9%) |
+| Estudiantes con < 15 años al matricularse | **636** (edad mínima 10,2) |
+| Oportunidades con `close_date` anterior a `created_at` | **1.029 de 3.000** (34,3%) |
+
+**Lectura para la presentación:** cada fila es una regla de validación que hoy el pipeline aplica *a posteriori* (flag) y que en producción debería impedirse *a priori* (validación en origen). El valor del proyecto no fue "limpiar" estos datos sino **hacerlos auditables sin perder la evidencia**.
 
 ---
 
