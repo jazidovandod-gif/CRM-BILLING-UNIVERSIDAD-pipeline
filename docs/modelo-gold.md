@@ -59,6 +59,7 @@ erDiagram
 | `kpi_lead_by_source` | Conversión de leads por canal de origen |
 | `kpi_student_vs_external` | Facturación de estudiantes vs. clientes externos |
 | `kpi_mrr_breakdown` | MRR real (vigente) vs. en riesgo (activa vencida) |
+| `kpi_headline` | Números titulares (una fila) para los *big numbers* del dashboard |
 
 ## Definiciones y convenciones
 

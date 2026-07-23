@@ -277,3 +277,19 @@ SELECT source,
        round(100.0 * count(*) FILTER (WHERE is_converted) / count(*), 1) AS conversion_pct
 FROM gold.fact_lead
 GROUP BY 1;
+
+-- Números titulares (una sola fila) para los "big numbers" del dashboard.
+-- Cada columna es un insight cuantificado.
+CREATE OR REPLACE VIEW gold.kpi_headline AS
+SELECT
+    (SELECT round(sum(monthly_price) FILTER (WHERE status = 'active' AND NOT is_effectively_expired), 0)
+       FROM gold.fact_subscription)                                          AS mrr_real,
+    (SELECT round(sum(monthly_price) FILTER (WHERE status = 'active'), 0)
+       FROM gold.fact_subscription)                                          AS mrr_nominal,
+    (SELECT round(100.0 * count(*) FILTER (WHERE status <> 'paid') / count(*), 1)
+       FROM gold.fact_invoice)                                               AS pct_sin_cobrar,
+    (SELECT round(100.0 * count(*) FILTER (WHERE is_won)
+             / NULLIF(count(*) FILTER (WHERE is_closed), 0), 1)
+       FROM gold.fact_opportunity)                                           AS win_rate_pct,
+    (SELECT round(100.0 * count(*) FILTER (WHERE is_converted) / count(*), 1)
+       FROM gold.fact_lead)                                                  AS lead_conversion_pct;

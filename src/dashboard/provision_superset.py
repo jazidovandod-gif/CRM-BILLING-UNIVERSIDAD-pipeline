@@ -54,6 +54,7 @@ KPI_VIEWS = [
     "kpi_student_vs_external",
     "kpi_mrr_breakdown",
     "kpi_lead_by_source",
+    "kpi_headline",
 ]
 
 
@@ -63,6 +64,32 @@ def _metric(column, label, aggregate="SUM"):
         "column": {"column_name": column},
         "aggregate": aggregate,
         "label": label,
+    }
+
+
+def _big_number(ds_id, column, subheader, fmt):
+    return {
+        "dataset": ds_id, "viz_type": "big_number_total",
+        "params": {
+            "metric": _metric(column, column, "MAX"),
+            "subheader": subheader, "y_axis_format": fmt,
+            "header_font_size": 0.4, "subheader_font_size": 0.15,
+        },
+    }
+
+
+def big_number_specs(ds):
+    """Cuatro 'big numbers' con los insights titulares, sobre gold.kpi_headline."""
+    h = ds["kpi_headline"]
+    return {
+        "bn_mrr": {"name": "MRR real vigente", **_big_number(
+            h, "mrr_real", "MRR real · nominal 532K (63% ya venció)", "$,.0f")},
+        "bn_sin_cobrar": {"name": "% facturado sin cobrar", **_big_number(
+            h, "pct_sin_cobrar", "% de facturas sin cobrar · ~900 días de mora", ".1f")},
+        "bn_winrate": {"name": "Win rate comercial", **_big_number(
+            h, "win_rate_pct", "% de deals ganados sobre cerrados", ".1f")},
+        "bn_lead_conv": {"name": "Conversión de leads", **_big_number(
+            h, "lead_conversion_pct", "% conversión · cold call 14,7% vs web 8,5%", ".1f")},
     }
 
 
@@ -176,6 +203,16 @@ INTRO_MD = (
     "el header (`invoices.total`) y los pagos suman ~1/5 — ver `docs/insights.md`."
 )
 
+INSIGHTS_MD = (
+    "### ⭐ Hallazgos accionables (detalle en `docs/insights.md`)\n"
+    "- **MRR inflado 2,7×:** el 63% de las suscripciones \"activas\" ya venció → MRR real **194.674**, no 532.490.\n"
+    "- **30% de lo facturado sin cobrar** con ~900 días de mora: no hay proceso de cobranza ni castigo.\n"
+    "- **Revenue sin fuente única:** cabecera 6,79M ≈ pagos 6,49M, pero items 34,93M (**5,14×**).\n"
+    "- **Cold call convierte 1,7× mejor que web** (14,7% vs 8,5%); el lead score no discrimina.\n"
+    "- **Pirámide invertida:** el tier *basic* aporta el 43% del revenue; *enterprise* solo el 9%.\n"
+    "- **Calidad:** 1.303 actas \"aprobadas\" sin nota; 100% de las oportunidades abiertas ya vencidas."
+)
+
 
 class Superset:
     def __init__(self):
@@ -261,8 +298,8 @@ class Superset:
         return dash_id
 
 
-def build_position(charts, specs):
-    """Layout con intro + una sección (HEADER) por tema, gráficos en filas de 2."""
+def build_position(charts, big_numbers, specs, bn_specs):
+    """Layout: intro + sección de Insights (big numbers + callout) + secciones KPI."""
     pos = {
         "DASHBOARD_VERSION_KEY": "v2",
         "ROOT_ID": {"type": "ROOT", "id": "ROOT_ID", "children": ["GRID_ID"]},
@@ -271,14 +308,48 @@ def build_position(charts, specs):
     }
     grid = pos["GRID_ID"]["children"]
 
-    # Intro (markdown a ancho completo)
-    pos["MD-intro"] = {
-        "type": "MARKDOWN", "id": "MD-intro", "children": [],
-        "parents": ["ROOT_ID", "GRID_ID"],
-        "meta": {"code": INTRO_MD, "width": 12, "height": 22},
-    }
-    grid.append("MD-intro")
+    def add_markdown(node_id, code, height):
+        pos[node_id] = {
+            "type": "MARKDOWN", "id": node_id, "children": [],
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "meta": {"code": code, "width": 12, "height": height},
+        }
+        grid.append(node_id)
 
+    def add_header(node_id, text):
+        pos[node_id] = {
+            "type": "HEADER", "id": node_id, "children": [],
+            "parents": ["ROOT_ID", "GRID_ID"],
+            "meta": {"text": text, "headerSize": "MEDIUM_HEADER",
+                     "background": "BACKGROUND_TRANSPARENT"},
+        }
+        grid.append(node_id)
+
+    # Intro
+    add_markdown("MD-intro", INTRO_MD, 22)
+
+    # ---- Sección de Insights: 4 big numbers + callout de texto ----
+    add_header("HEAD-insights", "⭐  Insights clave")
+    row_id = "ROW-bignum"
+    children = []
+    for k in ["bn_mrr", "bn_sin_cobrar", "bn_winrate", "bn_lead_conv"]:
+        cid = big_numbers[k]
+        node = f"CHART-{cid}"
+        children.append(node)
+        pos[node] = {
+            "type": "CHART", "id": node, "children": [],
+            "parents": ["ROOT_ID", "GRID_ID", row_id],
+            "meta": {"chartId": cid, "width": 3, "height": 40, "sliceName": bn_specs[k]["name"]},
+        }
+    pos[row_id] = {
+        "type": "ROW", "id": row_id, "children": children,
+        "parents": ["ROOT_ID", "GRID_ID"],
+        "meta": {"background": "BACKGROUND_TRANSPARENT"},
+    }
+    grid.append(row_id)
+    add_markdown("MD-insights", INSIGHTS_MD, 34)
+
+    # ---- Secciones de KPIs ----
     for si, (title, keys) in enumerate(SECTIONS):
         head_id = f"HEAD-{si}"
         pos[head_id] = {
@@ -325,11 +396,16 @@ def main():
     specs = chart_specs(ds)
     charts = {key: api.find_or_create_chart(key, spec) for key, spec in specs.items()}
 
-    position = build_position(charts, specs)
-    dash_id = api.upsert_dashboard(list(charts.values()), position)
+    bn_specs = big_number_specs(ds)
+    big_numbers = {key: api.find_or_create_chart(key, spec) for key, spec in bn_specs.items()}
+
+    position = build_position(charts, big_numbers, specs, bn_specs)
+    all_ids = list(charts.values()) + list(big_numbers.values())
+    dash_id = api.upsert_dashboard(all_ids, position)
 
     print(f"\nDashboard listo: {SUPERSET_URL}/superset/dashboard/{dash_id}/")
-    print(f"({len(ds)} datasets, {len(charts)} gráficos, {len(SECTIONS)} secciones)")
+    print(f"({len(ds)} datasets, {len(charts)} gráficos + {len(big_numbers)} big numbers, "
+          f"{len(SECTIONS) + 1} secciones)")
 
 
 if __name__ == "__main__":
