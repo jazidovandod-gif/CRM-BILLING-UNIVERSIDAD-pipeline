@@ -190,10 +190,10 @@ def chart_specs(ds):
 
 # Estructura del dashboard: (título de sección, [claves de gráficos]).
 SECTIONS = [
-    ("💰  Revenue y cobranza", ["revenue_mensual", "cobranza_moneda"]),
-    ("🔁  Suscripciones — MRR", ["mrr_breakdown", "subs_estado"]),
-    ("🎓  Rendimiento académico", ["aprobacion_depto", "academico_tabla"]),
-    ("📇  CRM y visión cross-dominio", ["pipeline_etapa", "leads_canal", "estudiante_externo"]),
+    ("Revenue y cobranza", ["revenue_mensual", "cobranza_moneda"]),
+    ("Suscripciones — MRR", ["mrr_breakdown", "subs_estado"]),
+    ("Rendimiento académico", ["aprobacion_depto", "academico_tabla"]),
+    ("CRM y visión cross-dominio", ["pipeline_etapa", "leads_canal", "estudiante_externo"]),
 ]
 
 INTRO_MD = (
@@ -204,7 +204,7 @@ INTRO_MD = (
 )
 
 INSIGHTS_MD = (
-    "### ⭐ Hallazgos accionables (detalle en `docs/insights.md`)\n"
+    "### Hallazgos accionables\n"
     "- **MRR inflado 2,7×:** el 63% de las suscripciones \"activas\" ya venció → MRR real **194.674**, no 532.490.\n"
     "- **30% de lo facturado sin cobrar** con ~900 días de mora: no hay proceso de cobranza ni castigo.\n"
     "- **Revenue sin fuente única:** cabecera 6,79M ≈ pagos 6,49M, pero items 34,93M (**5,14×**).\n"
@@ -329,7 +329,7 @@ def build_position(charts, big_numbers, specs, bn_specs):
     add_markdown("MD-intro", INTRO_MD, 22)
 
     # ---- Sección de Insights: 4 big numbers + callout de texto ----
-    add_header("HEAD-insights", "⭐  Insights clave")
+    add_header("HEAD-insights", "Insights clave")
     row_id = "ROW-bignum"
     children = []
     for k in ["bn_mrr", "bn_sin_cobrar", "bn_winrate", "bn_lead_conv"]:
